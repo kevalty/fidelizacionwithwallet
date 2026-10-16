@@ -217,26 +217,25 @@ alter table stamp_events    enable row level security;
 alter table redemptions     enable row level security;
 alter table audit_log       enable row level security;
 
--- Helper: returns the tenant_id the current JWT user belongs to.
-create or replace function auth.tenant_id()
+-- Helpers in public schema (auth schema is restricted in SQL editor).
+create or replace function public.current_tenant_id()
 returns uuid language sql stable security definer as $$
   select tenant_id from tenant_members where user_id = auth.uid() limit 1;
 $$;
 
--- Helper: returns the role of the current user in their tenant.
-create or replace function auth.tenant_role()
+create or replace function public.current_tenant_role()
 returns text language sql stable security definer as $$
   select role from tenant_members where user_id = auth.uid() limit 1;
 $$;
 
--- tenants: members can read their own tenant; owners can update.
+-- tenants: members can read their own tenant; owners/managers can update.
 create policy "members read own tenant"
   on tenants for select
-  using (id = auth.tenant_id());
+  using (id = public.current_tenant_id());
 
 create policy "owner update tenant"
   on tenants for update
-  using (id = auth.tenant_id() and auth.tenant_role() in ('owner','manager'));
+  using (id = public.current_tenant_id() and public.current_tenant_role() in ('owner','manager'));
 
 -- Generic pattern for tenant-scoped tables:
 -- read: any member of the tenant
@@ -250,16 +249,16 @@ begin
     'cards','wallet_passes','nfc_tags','stamp_events','redemptions','audit_log'
   ] loop
     execute format(
-      'create policy "tenant members read %1$s" on %1$s for select using (tenant_id = auth.tenant_id())', tbl);
+      'create policy "tenant members read %1$s" on %1$s for select using (tenant_id = public.current_tenant_id())', tbl);
     execute format(
-      'create policy "owner manager write %1$s" on %1$s for all using (tenant_id = auth.tenant_id() and auth.tenant_role() in (''owner'',''manager''))', tbl);
+      'create policy "owner manager write %1$s" on %1$s for all using (tenant_id = public.current_tenant_id() and public.current_tenant_role() in (''owner'',''manager''))', tbl);
   end loop;
 end $policies$;
 
--- stamp_events: staff can insert (to stamp a card)
+-- stamp_events: staff can also insert (to stamp a card)
 create policy "staff insert stamp_events"
   on stamp_events for insert
-  with check (tenant_id = auth.tenant_id());
+  with check (tenant_id = public.current_tenant_id());
 
 -- tenant_members: own row visible
 create policy "members read own row"
