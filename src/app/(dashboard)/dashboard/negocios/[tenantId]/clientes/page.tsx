@@ -24,12 +24,14 @@ export default async function ClientesPage({ params }: Props) {
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-gray-900">Clientes</h2>
-        <Link
-          href={`/api/tenants/${tenantId}/export`}
-          className="border border-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-50"
-        >
-          Exportar CSV
-        </Link>
+        <div className="flex gap-2">
+          <Link href={`/api/tenants/${tenantId}/export`} className="border border-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-50">
+            Exportar CSV
+          </Link>
+          <Link href={`/dashboard/negocios/${tenantId}/clientes/nuevo`} className="bg-black text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800">
+            + Nuevo cliente
+          </Link>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
@@ -59,8 +61,10 @@ export default async function ClientesPage({ params }: Props) {
                 return (
                   <tr key={c.id} className="hover:bg-gray-50">
                     <td className="px-6 py-3">
-                      <p className="text-sm font-medium text-gray-900">{c.name ?? "—"}</p>
-                      <p className="text-xs text-gray-500">{c.phone ?? "—"}</p>
+                      <Link href={`/dashboard/negocios/${tenantId}/clientes/${c.id}`} className="block">
+                        <p className="text-sm font-medium text-gray-900">{c.name ?? "—"}</p>
+                        <p className="text-xs text-gray-500">{c.phone ?? "—"}</p>
+                      </Link>
                     </td>
                     <td className="px-6 py-3 text-sm text-gray-700">{c.email ?? "—"}</td>
                     <td className="px-6 py-3 text-sm text-gray-700">{card?.stamp_count ?? 0}</td>

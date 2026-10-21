@@ -103,6 +103,40 @@ export async function getTenantProgram(tenantId: string) {
   return data ?? null;
 }
 
+export async function getCustomerDetail(tenantId: string, customerId: string) {
+  const db = createServiceClient();
+
+  const { data: customer, error } = await db
+    .from("customers")
+    .select(`
+      id, name, phone, email, created_at,
+      cards(id, stamp_count, status,
+        programs(stamps_required, reward_text)
+      )
+    `)
+    .eq("id", customerId)
+    .eq("tenant_id", tenantId)
+    .single();
+
+  if (error || !customer) return null;
+
+  const card = Array.isArray(customer.cards) ? customer.cards[0] : null;
+
+  const [stampsRes, redemptionsRes] = card
+    ? await Promise.all([
+        db.from("stamp_events").select("id, method, stamped_at").eq("card_id", card.id).order("stamped_at", { ascending: false }).limit(20),
+        db.from("redemptions").select("id, redeemed_at").eq("card_id", card.id).order("redeemed_at", { ascending: false }),
+      ])
+    : [{ data: [] }, { data: [] }];
+
+  return {
+    ...customer,
+    card,
+    stamps: stampsRes.data ?? [],
+    redemptions: redemptionsRes.data ?? [],
+  };
+}
+
 export async function getTenantLocations(tenantId: string) {
   const db = createServiceClient();
   const { data, error } = await db

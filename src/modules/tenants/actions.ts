@@ -95,3 +95,85 @@ export async function addLocation(formData: FormData) {
 
   redirect(`/dashboard/negocios/${tenantId}/locales`);
 }
+
+export async function createCustomer(formData: FormData) {
+  const db = createServiceClient();
+  const tenantId = formData.get("tenant_id") as string;
+  const name = (formData.get("name") as string).trim() || null;
+  const phone = (formData.get("phone") as string).trim() || null;
+  const email = (formData.get("email") as string).trim() || null;
+
+  if (!phone && !email) {
+    redirect(`/dashboard/negocios/${tenantId}/clientes/nuevo?error=Teléfono+o+correo+requerido`);
+  }
+
+  const { data: customer, error: ce } = await db
+    .from("customers")
+    .insert({ tenant_id: tenantId, name, phone: phone || null, email: email || null })
+    .select("id")
+    .single();
+
+  if (ce) {
+    const msg = ce.message.includes("unique") ? "Cliente+ya+registrado" : encodeURIComponent(ce.message);
+    redirect(`/dashboard/negocios/${tenantId}/clientes/nuevo?error=${msg}`);
+  }
+
+  await db.from("consents").insert({
+    customer_id: customer.id,
+    tenant_id: tenantId,
+    type: "data_storage",
+    version: "1.0",
+    granted: true,
+    channel: "staff",
+  });
+
+  const { data: program } = await db
+    .from("programs")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("active", true)
+    .single();
+
+  if (program) {
+    await db.from("cards").insert({
+      tenant_id: tenantId,
+      program_id: program.id,
+      customer_id: customer.id,
+    });
+  }
+
+  redirect(`/dashboard/negocios/${tenantId}/clientes/${customer.id}`);
+}
+
+export async function addStamp(formData: FormData) {
+  const db = createServiceClient();
+  const cardId = formData.get("card_id") as string;
+  const tenantId = formData.get("tenant_id") as string;
+  const customerId = formData.get("customer_id") as string;
+
+  const { error } = await db.from("stamp_events").insert({
+    idempotency_key: crypto.randomUUID(),
+    card_id: cardId,
+    tenant_id: tenantId,
+    method: "staff_scan",
+  });
+
+  if (error) {
+    redirect(`/dashboard/negocios/${tenantId}/clientes/${customerId}?error=${encodeURIComponent(error.message)}`);
+  }
+
+  redirect(`/dashboard/negocios/${tenantId}/clientes/${customerId}`);
+}
+
+export async function redeemCard(formData: FormData) {
+  const db = createServiceClient();
+  const cardId = formData.get("card_id") as string;
+  const tenantId = formData.get("tenant_id") as string;
+  const customerId = formData.get("customer_id") as string;
+
+  await db.from("redemptions").insert({ card_id: cardId, tenant_id: tenantId });
+  // Reset stamp count so the customer can start a new cycle
+  await db.from("cards").update({ stamp_count: 0 }).eq("id", cardId);
+
+  redirect(`/dashboard/negocios/${tenantId}/clientes/${customerId}`);
+}
