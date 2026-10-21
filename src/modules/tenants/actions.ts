@@ -71,7 +71,7 @@ export async function updateProgram(formData: FormData) {
     redirect(`/dashboard/negocios/${tenantId}/programa?error=${encodeURIComponent(error.message)}`);
   }
 
-  redirect(`/dashboard/negocios/${tenantId}/programa`);
+  redirect(`/dashboard/negocios/${tenantId}/programa?saved=1`);
 }
 
 export async function addLocation(formData: FormData) {
@@ -151,6 +151,30 @@ export async function createCustomer(formData: FormData) {
   }
 
   redirect(`/dashboard/negocios/${tenantId}/clientes/${customer.id}`);
+}
+
+export async function createCardForCustomer(formData: FormData) {
+  const db = createServiceClient();
+  const tenantId = formData.get("tenant_id") as string;
+  const customerId = formData.get("customer_id") as string;
+
+  const { data: program } = await db
+    .from("programs").select("id").eq("tenant_id", tenantId).eq("active", true).single();
+
+  if (!program) {
+    redirect(`/dashboard/negocios/${tenantId}/clientes/${customerId}?error=No+hay+programa+activo`);
+  }
+
+  const publicToken = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
+  const { error } = await db.from("cards").insert({
+    tenant_id: tenantId, program_id: program.id, customer_id: customerId, public_token: publicToken,
+  });
+
+  if (error) {
+    redirect(`/dashboard/negocios/${tenantId}/clientes/${customerId}?error=${encodeURIComponent(error.message)}`);
+  }
+
+  redirect(`/dashboard/negocios/${tenantId}/clientes/${customerId}`);
 }
 
 export async function addStamp(formData: FormData) {

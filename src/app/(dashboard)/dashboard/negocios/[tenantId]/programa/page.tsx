@@ -5,17 +5,23 @@ import { updateProgram } from "@/modules/tenants/actions";
 
 interface Props {
   params: Promise<{ tenantId: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; saved?: string }>;
 }
 
 export default async function ProgramaPage({ params, searchParams }: Props) {
   const { tenantId } = await params;
-  const { error } = await searchParams;
+  const { error, saved } = await searchParams;
   const program = await getTenantProgram(tenantId);
 
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-6">
       <h2 className="text-lg font-semibold text-gray-900">Programa de sellos</h2>
+
+      {saved && (
+        <div className="bg-green-50 border border-green-200 text-green-700 text-sm px-4 py-3 rounded-lg">
+          Cambios guardados correctamente.
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">

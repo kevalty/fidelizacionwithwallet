@@ -10,7 +10,7 @@ export async function getGlobalStats() {
 
   const [{ count: activeTenants }, { count: totalCustomers }, { count: stampsToday }] =
     await Promise.all([
-      db.from("tenants").select("*", { count: "exact", head: true }).eq("status", "active"),
+      db.from("tenants").select("*", { count: "exact", head: true }).in("status", ["active", "trial"]),
       db.from("customers").select("*", { count: "exact", head: true }),
       db
         .from("stamp_events")

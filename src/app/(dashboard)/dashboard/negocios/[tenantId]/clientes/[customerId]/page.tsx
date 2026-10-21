@@ -3,7 +3,7 @@ export const instant = false;
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getCustomerDetail } from "@/modules/tenants/queries";
-import { addStamp, redeemCard } from "@/modules/tenants/actions";
+import { addStamp, redeemCard, createCardForCustomer } from "@/modules/tenants/actions";
 
 interface Props {
   params: Promise<{ tenantId: string; customerId: string }>;
@@ -147,9 +147,16 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
           </div>
         </>
       ) : (
-        <p className="text-sm text-gray-500 bg-white rounded-xl border border-gray-100 p-6 text-center">
-          Sin tarjeta — el negocio no tiene programa activo.
-        </p>
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 text-center space-y-3">
+          <p className="text-sm text-gray-500">Este cliente no tiene tarjeta asignada.</p>
+          <form action={createCardForCustomer}>
+            <input type="hidden" name="tenant_id" value={tenantId} />
+            <input type="hidden" name="customer_id" value={customerId} />
+            <button type="submit" className="bg-black text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800">
+              Crear tarjeta
+            </button>
+          </form>
+        </div>
       )}
     </div>
   );
