@@ -135,11 +135,19 @@ export async function createCustomer(formData: FormData) {
     .single();
 
   if (program) {
-    await db.from("cards").insert({
+    // Generate token here — DB default (base64url) not supported in Postgres 15.
+    const publicToken = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
+    const { error: cardError } = await db.from("cards").insert({
       tenant_id: tenantId,
       program_id: program.id,
       customer_id: customer.id,
+      public_token: publicToken,
     });
+    if (cardError) {
+      redirect(`/dashboard/negocios/${tenantId}/clientes/nuevo?error=${encodeURIComponent("Tarjeta no creada: " + cardError.message)}`);
+    }
+  } else {
+    redirect(`/dashboard/negocios/${tenantId}/clientes/nuevo?error=El+negocio+no+tiene+programa+activo`);
   }
 
   redirect(`/dashboard/negocios/${tenantId}/clientes/${customer.id}`);
