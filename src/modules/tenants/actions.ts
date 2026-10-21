@@ -2,6 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { createServiceClient } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase-server";
+import { getMemberRole } from "@/modules/auth/queries";
 
 export async function createTenant(formData: FormData) {
   const db = createServiceClient();
@@ -208,4 +210,121 @@ export async function redeemCard(formData: FormData) {
   await db.from("cards").update({ stamp_count: 0 }).eq("id", cardId);
 
   redirect(`/dashboard/negocios/${tenantId}/clientes/${customerId}`);
+}
+
+export async function registerCustomer(formData: FormData) {
+  const db = createServiceClient();
+  const slug = formData.get("slug") as string;
+  const phone = (formData.get("phone") as string).trim();
+  const name = ((formData.get("name") as string) || "").trim() || null;
+
+  if (!phone) redirect(`/t/${slug}?error=Teléfono+requerido`);
+
+  const { data: tenant } = await db
+    .from("tenants")
+    .select("id, programs(id, active)")
+    .eq("slug", slug)
+    .in("status", ["active", "trial"])
+    .single();
+
+  if (!tenant) redirect(`/t/${slug}?error=Negocio+no+encontrado`);
+
+  // Return existing card if already registered
+  const { data: existing } = await db
+    .from("customers")
+    .select("id, cards(id, public_token)")
+    .eq("tenant_id", tenant.id)
+    .eq("phone", phone)
+    .single();
+
+  if (existing) {
+    const cards = existing.cards as { id: string; public_token: string }[] | null;
+    const card = Array.isArray(cards) ? cards[0] : cards;
+    if (card) redirect(`/c/${card.public_token}`);
+  }
+
+  const { data: customer, error: ce } = await db
+    .from("customers")
+    .insert({ tenant_id: tenant.id, name, phone })
+    .select("id")
+    .single();
+
+  if (ce) redirect(`/t/${slug}?error=${encodeURIComponent(ce.message)}`);
+
+  await db.from("consents").insert({
+    customer_id: customer.id,
+    tenant_id: tenant.id,
+    type: "data_storage",
+    version: "1.0",
+    granted: true,
+    channel: "self",
+  });
+
+  const programs = tenant.programs as { id: string; active: boolean }[] | null;
+  const program = Array.isArray(programs) ? programs.find((p) => p.active) : programs;
+  if (!program) redirect(`/t/${slug}?error=Negocio+sin+programa+activo`);
+
+  const publicToken = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
+  const { error: cardError } = await db.from("cards").insert({
+    tenant_id: tenant.id,
+    program_id: program.id,
+    customer_id: customer.id,
+    public_token: publicToken,
+  });
+
+  if (cardError) redirect(`/t/${slug}?error=${encodeURIComponent(cardError.message)}`);
+
+  redirect(`/c/${publicToken}`);
+}
+
+export async function staffStamp(formData: FormData) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const member = await getMemberRole(supabase, user.id);
+  if (!member) redirect("/login");
+
+  const db = createServiceClient();
+  const cardId = formData.get("card_id") as string;
+  const phone = formData.get("phone") as string;
+
+  const { data: card } = await db.from("cards").select("tenant_id").eq("id", cardId).single();
+  if (!card || card.tenant_id !== member.tenant_id) {
+    redirect(`/staff?phone=${encodeURIComponent(phone)}&error=Tarjeta+no+válida`);
+  }
+
+  const { error } = await db.from("stamp_events").insert({
+    idempotency_key: crypto.randomUUID(),
+    card_id: cardId,
+    tenant_id: member.tenant_id,
+    method: "staff_scan",
+  });
+
+  if (error) redirect(`/staff?phone=${encodeURIComponent(phone)}&error=${encodeURIComponent(error.message)}`);
+
+  redirect(`/staff?phone=${encodeURIComponent(phone)}&stamped=1`);
+}
+
+export async function staffRedeem(formData: FormData) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const member = await getMemberRole(supabase, user.id);
+  if (!member) redirect("/login");
+
+  const db = createServiceClient();
+  const cardId = formData.get("card_id") as string;
+  const phone = formData.get("phone") as string;
+
+  const { data: card } = await db.from("cards").select("tenant_id").eq("id", cardId).single();
+  if (!card || card.tenant_id !== member.tenant_id) {
+    redirect(`/staff?phone=${encodeURIComponent(phone)}&error=Tarjeta+no+válida`);
+  }
+
+  await db.from("redemptions").insert({ card_id: cardId, tenant_id: member.tenant_id });
+  await db.from("cards").update({ stamp_count: 0 }).eq("id", cardId);
+
+  redirect(`/staff?phone=${encodeURIComponent(phone)}&redeemed=1`);
 }

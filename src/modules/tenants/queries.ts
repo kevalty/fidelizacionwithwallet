@@ -137,6 +137,43 @@ export async function getCustomerDetail(tenantId: string, customerId: string) {
   };
 }
 
+export async function getTenantBySlug(slug: string) {
+  const db = createServiceClient();
+  const { data } = await db
+    .from("tenants")
+    .select("id, slug, name, programs(id, stamps_required, reward_text, active)")
+    .eq("slug", slug)
+    .in("status", ["active", "trial"])
+    .single();
+  return data ?? null;
+}
+
+export async function getCardByToken(token: string) {
+  const db = createServiceClient();
+  const { data } = await db
+    .from("cards")
+    .select(`
+      id, stamp_count, status, public_token,
+      programs(stamps_required, reward_text),
+      customers(name, phone),
+      tenants(name, slug)
+    `)
+    .eq("public_token", token)
+    .single();
+  return data ?? null;
+}
+
+export async function findCustomerCard(tenantId: string, phone: string) {
+  const db = createServiceClient();
+  const { data } = await db
+    .from("customers")
+    .select("id, name, phone, cards(id, stamp_count, status, public_token, programs(stamps_required, reward_text))")
+    .eq("tenant_id", tenantId)
+    .eq("phone", phone)
+    .single();
+  return data ?? null;
+}
+
 export async function getTenantLocations(tenantId: string) {
   const db = createServiceClient();
   const { data, error } = await db
