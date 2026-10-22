@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { createServiceClient } from "@/lib/supabase";
 import { createClient } from "@/lib/supabase-server";
 import { getMemberRole } from "@/modules/auth/queries";
@@ -240,7 +241,10 @@ export async function registerCustomer(formData: FormData) {
   if (existing) {
     const cards = existing.cards as { id: string; public_token: string }[] | null;
     const card = Array.isArray(cards) ? cards[0] : cards;
-    if (card) redirect(`/c/${card.public_token}`);
+    if (card) {
+      (await cookies()).set(`card_${slug}`, card.public_token, { maxAge: 60 * 60 * 24 * 365, path: "/", sameSite: "lax" });
+      redirect(`/c/${card.public_token}`);
+    }
   }
 
   const { data: customer, error: ce } = await db
@@ -274,6 +278,7 @@ export async function registerCustomer(formData: FormData) {
 
   if (cardError) redirect(`/t/${slug}?error=${encodeURIComponent(cardError.message)}`);
 
+  (await cookies()).set(`card_${slug}`, publicToken, { maxAge: 60 * 60 * 24 * 365, path: "/", sameSite: "lax" });
   redirect(`/c/${publicToken}`);
 }
 

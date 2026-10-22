@@ -5,8 +5,9 @@ export async function getGlobalStats() {
   // connection() opts into dynamic rendering so new Date() is per-request
   await connection();
   const db = createServiceClient();
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // Midnight in Ecuador (America/Guayaquil, UTC-5, no DST)
+  const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/Guayaquil" });
+  const today = new Date(todayStr + "T00:00:00-05:00");
 
   const [{ count: activeTenants }, { count: totalCustomers }, { count: stampsToday }] =
     await Promise.all([

@@ -1,6 +1,7 @@
 export const instant = false;
 
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { createServiceClient } from "@/lib/supabase";
 import { registerCustomer } from "@/modules/tenants/actions";
 
@@ -12,6 +13,11 @@ interface Props {
 export default async function TagPage({ params, searchParams }: Props) {
   const { tagId } = await params;
   const { error } = await searchParams;
+
+  // Returning customer: redirect to their card
+  const cookieStore = await cookies();
+  const savedToken = cookieStore.get(`card_${tagId}`)?.value;
+  if (savedToken && !error) redirect(`/c/${savedToken}`);
 
   const db = createServiceClient();
   const { data: tenant } = await db
