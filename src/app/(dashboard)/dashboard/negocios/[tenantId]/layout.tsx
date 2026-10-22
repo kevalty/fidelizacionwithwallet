@@ -9,6 +9,7 @@ const tabs = [
   { href: "/clientes", label: "Clientes" },
   { href: "/programa", label: "Programa" },
   { href: "/locales", label: "Locales" },
+  { href: "/qr", label: "QR" },
   { href: "/suscripcion", label: "Suscripción" },
 ];
 
